@@ -148,6 +148,7 @@ async def websocket_endpoint(ws: WebSocket):
             if msg_type == "start":
                 url = data.get("url", "")
                 relaunch_path = data.get("path")
+                engine.auto_mode = data.get("auto_mode", False)
                 if relaunch_path:
                     user_msg = f"Please relaunch the project at {relaunch_path}. It was installed from {url}. Check what services need to start and launch them."
                 else:

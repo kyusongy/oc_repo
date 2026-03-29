@@ -14,11 +14,13 @@ class AgentEngine:
         model: str,
         registry: ToolRegistry,
         session: Session | None = None,
+        auto_mode: bool = False,
     ):
         self.client = client
         self.model = model
         self.registry = registry
         self.session = session
+        self.auto_mode = auto_mode
 
     async def run(self, user_message: str, history: list[dict]):
         """Run the agent loop. Yields text messages from the agent."""
@@ -69,22 +71,70 @@ class AgentEngine:
                     if hasattr(tool, "session") and self.session:
                         tool.session = self.session
 
+                    # Notify frontend that a tool is starting
+                    if self.session:
+                        desc = arguments.get("description", tool_name)
+                        await self.session.send(
+                            {
+                                "type": "tool_start",
+                                "tool_name": tool_name,
+                                "description": desc,
+                            }
+                        )
+
                     # Handle approval for tools that require it
                     if tool.requires_approval and self.session:
-                        description = arguments.get("description", tool_name)
                         command = arguments.get("command", str(arguments))
-                        approved = await self.session.request_approval(
-                            command, description
-                        )
-                        if not approved:
-                            history.append(
-                                {
-                                    "role": "tool",
-                                    "tool_call_id": tc.id,
-                                    "content": "User denied this action.",
-                                }
+                        description = arguments.get("description", tool_name)
+
+                        if self.auto_mode:
+                            safety = await classify_command(
+                                command, self.client, self.model
                             )
-                            continue
+                            if safety == "safe":
+                                await self.session.send(
+                                    {
+                                        "type": "auto_approved",
+                                        "command": command,
+                                        "description": description,
+                                    }
+                                )
+                                # proceed to execute
+                            elif safety == "dangerous":
+                                history.append(
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": tc.id,
+                                        "content": "Command blocked for safety. This command was classified as dangerous and cannot be auto-executed.",
+                                    }
+                                )
+                                continue
+                            else:  # sensitive
+                                approved = await self.session.request_approval(
+                                    command, description
+                                )
+                                if not approved:
+                                    history.append(
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": tc.id,
+                                            "content": "User denied this action.",
+                                        }
+                                    )
+                                    continue
+                        else:
+                            approved = await self.session.request_approval(
+                                command, description
+                            )
+                            if not approved:
+                                history.append(
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": tc.id,
+                                        "content": "User denied this action.",
+                                    }
+                                )
+                                continue
 
                     result = await tool.execute(arguments)
 
