@@ -44,18 +44,35 @@ async def list_projects():
     return [asdict(p) for p in projects]
 
 
+async def _kill_project_ports(ports: list[int]):
+    """Kill processes on given ports, but never kill our own process."""
+    my_pid = os.getpid()
+    for port in ports:
+        # Get PIDs on this port
+        proc = await asyncio.create_subprocess_shell(
+            f"lsof -ti:{port}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        for pid_str in stdout.decode().strip().split("\n"):
+            if not pid_str:
+                continue
+            pid = int(pid_str)
+            if pid == my_pid:
+                continue  # never kill ourselves
+            try:
+                os.kill(pid, 15)  # SIGTERM
+            except ProcessLookupError:
+                pass
+
+
 @app.post("/api/projects/{name}/stop")
 async def stop_project(name: str):
     project = get_project(name)
     if not project:
         raise HTTPException(404, "Project not found")
-    for port in project.ports:
-        proc = await asyncio.create_subprocess_shell(
-            f"lsof -ti:{port} | xargs kill 2>/dev/null",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
+    await _kill_project_ports(project.ports)
     # Update status
     projects = load_projects()
     for p in projects:
@@ -71,13 +88,7 @@ async def delete_project(name: str):
     if not project:
         raise HTTPException(404, "Project not found")
     # Stop first
-    for port in project.ports:
-        proc = await asyncio.create_subprocess_shell(
-            f"lsof -ti:{port} | xargs kill 2>/dev/null",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
+    await _kill_project_ports(project.ports)
     # Delete directory
     if os.path.exists(project.path):
         shutil.rmtree(project.path)

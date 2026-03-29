@@ -262,7 +262,7 @@ oc_repo/
 │   │   ├── check_system.py
 │   │   ├── ask_user.py
 │   │   └── report_status.py
-│   └── requirements.txt
+│   └── pyproject.toml
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx
@@ -279,6 +279,8 @@ oc_repo/
 │   │   └── types.ts
 │   ├── package.json
 │   └── tailwind.config.js
+├── pyproject.toml              # uv project config (backend deps)
+├── uv.lock
 ├── .env.example
 └── README.md
 ```
