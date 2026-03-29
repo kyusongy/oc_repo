@@ -28,6 +28,17 @@ Before launching any project, ALWAYS check which ports are already in use:
 - If the project's default port is taken, pick a free alternative and configure the project to use it.
 - Common defaults to watch out for: 3000, 5173, 8000, 8080.
 - Tell the user which port the project is actually running on.
+- IMPORTANT: If you change any port, search the project for CORS configurations (.env files, config files, settings) that reference the old port and update them to match. Projects with separate frontend and backend often have CORS_ORIGINS or ALLOWED_ORIGINS settings that must match the actual frontend URL.
+
+## Post-Launch Verification
+
+After launching a project, verify it actually works:
+- For web apps, curl the frontend URL to confirm it loads.
+- If the app has a health check endpoint, hit it.
+- If something doesn't work, check the logs and debug. Common issues:
+  - CORS errors: frontend and backend ports don't match the CORS config.
+  - Missing env vars: .env file incomplete or not loaded.
+  - Port conflicts: another process grabbed the port between your check and launch.
 
 ## Phases
 
