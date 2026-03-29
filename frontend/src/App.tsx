@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { ChatMessage, ClientMessage, Phase, ServerMessage } from "./types";
 import { useWebSocket } from "./hooks/useWebSocket";
-import { UrlInput } from "./components/UrlInput";
+import { LandingHero } from "./components/LandingHero";
 import { StatusBar } from "./components/StatusBar";
 import { ChatWindow } from "./components/ChatWindow";
 
@@ -71,25 +71,77 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">One-Click Repo</h1>
-        <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} title={connected ? "Connected" : "Disconnected"} />
+    <div className="h-screen flex flex-col bg-surface">
+      {/* Header */}
+      <header className="bg-surface/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <div className="flex justify-between items-center w-full px-6 py-4">
+          <div className="flex items-center gap-4">
+            <span className="text-xl font-bold tracking-tighter text-on-surface font-headline">oc_repo</span>
+            {started && (
+              <>
+                <div className="bg-surface-low h-5 w-px mx-2"></div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-tertiary/10 rounded-full">
+                  <span className={`w-2 h-2 rounded-full ${phase === "done" ? "bg-emerald-500" : phase === "error" ? "bg-error" : "bg-tertiary animate-pulse"}`}></span>
+                  <span className="text-[10px] font-body uppercase tracking-widest text-on-surface-variant">
+                    {phase === "idle" ? "Ready" : phase}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="text-primary hover:text-on-surface transition-colors p-1">
+              <span className="material-symbols-outlined">help</span>
+            </button>
+            <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-emerald-500" : "bg-error"}`} title={connected ? "Connected" : "Disconnected"} />
+          </div>
+        </div>
+        <div className="bg-surface-low h-px w-full"></div>
       </header>
 
+      {/* Status bar */}
       <StatusBar phase={phase} message={statusMessage} progress={progress} />
 
-      {!started && <UrlInput onSubmit={handleUrlSubmit} />}
+      {/* Main content */}
+      {!started ? (
+        <LandingHero onSubmit={handleUrlSubmit} />
+      ) : (
+        <>
+          <ChatWindow messages={messages} onSend={handleSend} />
 
-      <ChatWindow messages={messages} onSend={handleSend} />
+          {/* Chat input */}
+          <footer className="bg-surface p-4 border-t border-outline-variant/10 z-10">
+            <form onSubmit={handleChatSubmit} className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-3 bg-surface-low rounded-xl p-2 focus-within:bg-surface-lowest focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask a question or type a message..."
+                  className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 font-body"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim()}
+                  className="signature-cta text-on-primary p-2.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center justify-center disabled:opacity-40"
+                >
+                  <span className="material-symbols-outlined">send</span>
+                </button>
+              </div>
+            </form>
+          </footer>
+        </>
+      )}
 
-      {started && (
-        <form onSubmit={handleChatSubmit} className="flex gap-2 p-4 border-t border-gray-200">
-          <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..." className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <button type="submit" disabled={!chatInput.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            Send
-          </button>
-        </form>
+      {/* Footer on landing only */}
+      {!started && (
+        <footer className="w-full py-8 px-6 border-t border-outline-variant/10">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <p className="text-xs font-body uppercase tracking-widest text-on-surface-variant/40">
+              &copy; 2026 One-Click Repo
+            </p>
+          </div>
+        </footer>
       )}
     </div>
   );
