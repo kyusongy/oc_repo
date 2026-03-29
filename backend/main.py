@@ -115,7 +115,7 @@ async def stop_project(name: str):
 
 @app.delete("/api/projects/{name}")
 async def delete_project(name: str):
-    project = _require_project(name)
+    project = _require_project_or_detect(name)
     await _kill_project_ports(project.ports)
     if os.path.exists(project.path):
         shutil.rmtree(project.path)
