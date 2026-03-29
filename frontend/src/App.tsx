@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage, ClientMessage, Phase, ProjectInfo, ServerMessage } from "./types";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { LandingHero } from "./components/LandingHero";
@@ -18,6 +18,23 @@ export default function App() {
   const [autoMode, setAutoMode] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
   const [currentTool, setCurrentTool] = useState<{ name: string; description: string } | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Save history when messages change (only once project is known)
+  useEffect(() => {
+    if (!currentProject || messages.length === 0) return;
+
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      fetch(`/api/projects/${encodeURIComponent(currentProject.name)}/history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(messages),
+      }).catch(() => {});
+    }, 1000);
+
+    return () => clearTimeout(saveTimeoutRef.current);
+  }, [messages, currentProject]);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
@@ -69,12 +86,38 @@ export default function App() {
 
   const { send, connected } = useWebSocket(handleMessage);
 
-  const handleViewProject = (project: ProjectInfo) => {
-    setStarted(true);
-    setPhase("done");
-    setCurrentProject(project);
-    setStatusMessage(`${project.name} is installed and running`.toUpperCase());
+  const handleGoHome = () => {
+    setStarted(false);
+    setPhase("idle");
     setMessages([]);
+    setCurrentProject(null);
+    setCurrentTool(null);
+    setIsThinking(false);
+    setStatusMessage("");
+    setProgress(undefined);
+    setChatInput("");
+  };
+
+  const handleViewProject = async (project: ProjectInfo) => {
+    setStarted(true);
+    setCurrentProject(project);
+
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(project.name)}/history`);
+      if (res.ok) {
+        const history = await res.json();
+        if (history.length > 0) {
+          setMessages(history);
+          setPhase("done");
+          setStatusMessage(`${project.name} — viewing session history`.toUpperCase());
+          return;
+        }
+      }
+    } catch {}
+
+    setMessages([]);
+    setPhase("done");
+    setStatusMessage(`${project.name} is installed`.toUpperCase());
   };
 
   const handleRelaunch = (project: ProjectInfo) => {
@@ -126,7 +169,7 @@ export default function App() {
       <header className="bg-surface/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
         <div className="flex justify-between items-center w-full px-6 py-4">
           <div className="flex items-center gap-4">
-            <button onClick={() => window.location.reload()} className="text-xl font-bold tracking-tighter text-on-surface font-headline hover:text-tertiary transition-colors">oc_repo</button>
+            <button onClick={handleGoHome} className="text-xl font-bold tracking-tighter text-on-surface font-headline hover:text-tertiary transition-colors">oc_repo</button>
             {started && (
               <>
                 <div className="bg-surface-low h-5 w-px mx-2"></div>
@@ -172,6 +215,7 @@ export default function App() {
           chatInput={chatInput}
           onChatInputChange={setChatInput}
           onChatSubmit={handleChatSubmit}
+          onGoHome={handleGoHome}
         />
       ) : (
         <>

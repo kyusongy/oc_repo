@@ -8,9 +8,10 @@ interface Props {
   chatInput: string;
   onChatInputChange: (value: string) => void;
   onChatSubmit: (e: React.FormEvent) => void;
+  onGoHome: () => void;
 }
 
-export function SuccessScreen({ project, lastAgentMessage, chatInput, onChatInputChange, onChatSubmit }: Props) {
+export function SuccessScreen({ project, lastAgentMessage, chatInput, onChatInputChange, onChatSubmit, onGoHome }: Props) {
   const [stopping, setStopping] = useState(false);
   const [stopped, setStopped] = useState(false);
 
@@ -138,7 +139,7 @@ export function SuccessScreen({ project, lastAgentMessage, chatInput, onChatInpu
 
         {/* Back to Home */}
         <button
-          onClick={() => window.location.reload()}
+          onClick={onGoHome}
           className="text-primary text-sm font-semibold hover:underline decoration-2 underline-offset-4 flex items-center gap-2"
         >
           <span className="material-symbols-outlined text-sm">arrow_back</span>
