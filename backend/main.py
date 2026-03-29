@@ -4,17 +4,22 @@ import shutil
 from dataclasses import asdict
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.agent.engine import AgentEngine
 from backend.agent.llm import get_client, get_model
 from backend.projects import (
-    load_projects,
+    _workspace,
     get_project,
-    remove_project,
+    load_history,
+    load_projects,
+    load_projects_with_auto_detect,
     refresh_statuses,
+    remove_project,
+    save_history,
     save_projects,
+    ProjectInfo,
 )
 from backend.session import Session
 from backend.tools import create_registry
@@ -38,9 +43,11 @@ async def health():
 
 @app.get("/api/projects")
 async def list_projects():
-    projects = load_projects()
+    projects = load_projects_with_auto_detect()
     projects = await refresh_statuses(projects)
-    save_projects(projects)  # persist updated statuses
+    # Only save tracked projects (not auto-detected ones without installed_at)
+    tracked = [p for p in projects if p.installed_at]
+    save_projects(tracked)
     return [asdict(p) for p in projects]
 
 
@@ -74,6 +81,26 @@ def _require_project(name: str):
     return project
 
 
+def _require_project_or_detect(name: str):
+    # Check tracked first
+    project = get_project(name)
+    if project:
+        return project
+    # Check auto-detected
+    workspace = _workspace()
+    path = os.path.join(workspace, name)
+    if os.path.isdir(path):
+        return ProjectInfo(
+            name=name,
+            url="",
+            path=path,
+            ports=[],
+            installed_at="",
+            status="stopped",
+        )
+    raise HTTPException(404, "Project not found")
+
+
 @app.post("/api/projects/{name}/stop")
 async def stop_project(name: str):
     projects = load_projects()
@@ -102,6 +129,20 @@ async def open_project(name: str):
     if os.path.exists(project.path):
         await asyncio.create_subprocess_exec("open", project.path)
     return {"status": "opened", "path": project.path}
+
+
+@app.get("/api/projects/{name}/history")
+async def get_history(name: str):
+    project = _require_project_or_detect(name)
+    return load_history(project.path)
+
+
+@app.post("/api/projects/{name}/history")
+async def post_history(name: str, request: Request):
+    project = _require_project_or_detect(name)
+    messages = await request.json()
+    save_history(project.path, messages)
+    return {"status": "saved"}
 
 
 @app.websocket("/ws")

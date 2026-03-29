@@ -62,6 +62,59 @@ def get_project(name: str) -> ProjectInfo | None:
     return None
 
 
+def _history_file(project_path: str) -> str:
+    return os.path.join(project_path, ".oc_history.json")
+
+
+def save_history(project_path: str, messages: list[dict]):
+    path = _history_file(project_path)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(messages, f)
+    os.replace(tmp, path)
+
+
+def load_history(project_path: str) -> list[dict]:
+    path = _history_file(project_path)
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def load_projects_with_auto_detect() -> list[ProjectInfo]:
+    """Load tracked projects and auto-detect untracked directories in workspace."""
+    tracked = load_projects()
+    tracked_names = {p.name for p in tracked}
+
+    workspace = _workspace()
+    if not os.path.isdir(workspace):
+        return tracked
+
+    for entry in os.listdir(workspace):
+        entry_path = os.path.join(workspace, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        if entry.startswith("."):
+            continue
+        if entry in tracked_names:
+            continue
+        # Auto-detected untracked project
+        tracked.append(
+            ProjectInfo(
+                name=entry,
+                url="",
+                path=entry_path,
+                ports=[],
+                installed_at="",
+                status="stopped",
+                launch_url=None,
+            )
+        )
+
+    return tracked
+
+
 async def check_port_active(port: int) -> bool:
     proc = await asyncio.create_subprocess_shell(
         f"lsof -ti:{port}",
