@@ -1,9 +1,11 @@
 import { useCallback, useState } from "react";
-import type { ChatMessage, ClientMessage, Phase, ServerMessage } from "./types";
+import type { ChatMessage, ClientMessage, Phase, ProjectInfo, ServerMessage } from "./types";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { LandingHero } from "./components/LandingHero";
 import { StatusBar } from "./components/StatusBar";
 import { ChatWindow } from "./components/ChatWindow";
+import { SuccessScreen } from "./components/SuccessScreen";
+import { ProjectList } from "./components/ProjectList";
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -12,6 +14,7 @@ export default function App() {
   const [progress, setProgress] = useState<number | undefined>();
   const [started, setStarted] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [currentProject, setCurrentProject] = useState<ProjectInfo | null>(null);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
@@ -36,10 +39,21 @@ export default function App() {
         setPhase(msg.success ? "done" : "error");
         setStatusMessage(msg.message);
         break;
+      case "project_saved":
+        setCurrentProject(msg.project);
+        break;
     }
   }, []);
 
   const { send, connected } = useWebSocket(handleMessage);
+
+  const handleRelaunch = (project: ProjectInfo) => {
+    setStarted(true);
+    setPhase("scanning");
+    setCurrentProject(null);
+    setMessages([{ kind: "user", text: `Relaunch ${project.name}` }]);
+    send({ type: "start", url: project.url, path: project.path });
+  };
 
   const handleUrlSubmit = (url: string) => {
     setStarted(true);
@@ -104,7 +118,22 @@ export default function App() {
 
       {/* Main content */}
       {!started ? (
-        <LandingHero onSubmit={handleUrlSubmit} />
+        <>
+          <LandingHero onSubmit={handleUrlSubmit} />
+          <ProjectList onRelaunch={handleRelaunch} />
+          <footer className="w-full py-8 px-6 border-t border-outline-variant/10">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <p className="text-xs font-body uppercase tracking-widest text-on-surface-variant/40">
+                &copy; 2026 One-Click Repo
+              </p>
+            </div>
+          </footer>
+        </>
+      ) : phase === "done" && currentProject ? (
+        <SuccessScreen
+          project={currentProject}
+          lastAgentMessage={messages.filter((m) => m.kind === "agent").pop()?.text || ""}
+        />
       ) : (
         <>
           <ChatWindow messages={messages} onSend={handleSend} />
@@ -131,17 +160,6 @@ export default function App() {
             </form>
           </footer>
         </>
-      )}
-
-      {/* Footer on landing only */}
-      {!started && (
-        <footer className="w-full py-8 px-6 border-t border-outline-variant/10">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <p className="text-xs font-body uppercase tracking-widest text-on-surface-variant/40">
-              &copy; 2026 One-Click Repo
-            </p>
-          </div>
-        </footer>
       )}
     </div>
   );
