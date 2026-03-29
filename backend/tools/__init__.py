@@ -6,6 +6,7 @@ from backend.tools.run_command import RunCommandTool
 from backend.tools.ask_user import AskUserTool
 from backend.tools.report_status import ReportStatusTool
 from backend.tools.save_project import SaveProjectTool
+from backend.tools.write_file import WriteFileTool
 from backend.tools.base import ToolRegistry
 
 
@@ -20,5 +21,6 @@ def create_registry() -> ToolRegistry:
             AskUserTool(),
             ReportStatusTool(),
             SaveProjectTool(),
+            WriteFileTool(),
         ]
     )
