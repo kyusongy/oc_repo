@@ -13,8 +13,9 @@ def test_safe_uv_sync():
     assert classify_rule_based("uv sync") == "safe"
 
 
-def test_safe_cat_write():
-    assert classify_rule_based("cat > .env <<'EOF'") == "safe"
+def test_cat_write_not_auto_safe():
+    # File writes via shell should not be auto-approved (use write_file tool)
+    assert classify_rule_based("cat > .env <<'EOF'") is None
 
 
 def test_safe_curl_check():

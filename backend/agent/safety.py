@@ -9,7 +9,8 @@ SAFE_PATTERNS = [
     r"^uv\s+(sync|run|pip install)\b",
     r"^brew\s+install\b",
     r"^cargo\s+(build|install)\b",
-    r"^(cat|ls|head|tail|wc|find|which|type|file|stat)\b",
+    r"^(ls|head|tail|wc|find|which|type|file|stat)\b",
+    r"^cat\s+[^>|]",  # cat for reading only, not redirecting
     r"^(python3?|node|ruby|go|java|cargo)\s+(-[vV]|--version)",
     r"^(python3?|node)\s+-c\s+",  # inline scripts for checks
     r"^mkdir\b",

@@ -1,6 +1,6 @@
 import asyncio
-import os
 
+from backend.projects import _workspace
 from backend.tools.base import Tool, ToolResult
 
 DEFAULT_TIMEOUT = 300  # 5 minutes
@@ -38,7 +38,7 @@ class RunCommandTool(Tool):
 
     async def execute(self, params: dict) -> ToolResult:
         command = params["command"]
-        cwd = params.get("cwd", os.path.expanduser("~/oc_repo_workspace"))
+        cwd = params.get("cwd", _workspace())
         timeout = params.get("timeout", DEFAULT_TIMEOUT)
 
         try:
