@@ -11,6 +11,11 @@ from backend.agent.llm import get_client, get_model
 from backend.tools import create_registry
 
 
+def log(msg: str = ""):
+    """Print with immediate flush."""
+    print(msg, flush=True)
+
+
 class CliSession:
     """Terminal-based session that replaces WebSocket communication."""
 
@@ -28,19 +33,19 @@ class CliSession:
             command = msg["command"]
             description = msg["description"]
 
-            print(f"\n{'=' * 60}")
-            print("APPROVAL REQUIRED")
-            print(f"   {description}")
-            print(f"   Command: {command}")
-            print(f"{'=' * 60}")
+            log(f"\n{'=' * 60}")
+            log("APPROVAL REQUIRED")
+            log(f"   {description}")
+            log(f"   Command: {command}")
+            log(f"{'=' * 60}")
 
             if self.auto_approve:
-                print("   Auto-approved")
+                log("   Auto-approved")
                 approved = True
             else:
                 response = input("   Approve? [y/N]: ").strip().lower()
                 approved = response in ("y", "yes")
-                print(f"   {'Approved' if approved else 'Denied'}")
+                log(f"   {'Approved' if approved else 'Denied'}")
 
             future = self._pending.pop(request_id, None)
             if future and not future.done():
@@ -52,12 +57,18 @@ class CliSession:
             input_type = msg.get("input_type", "text")
             options = msg.get("options")
 
-            print(f"\n{'=' * 60}")
-            print(f"? {question}")
+            log(f"\n{'=' * 60}")
+            log(f"? {question}")
 
-            if options and input_type == "choice":
+            if self.auto_approve:
+                if options and input_type == "choice":
+                    value = options[0]["label"]
+                else:
+                    value = "SKIPPED_IN_AUTO_MODE"
+                log(f"   Auto-response: {value}")
+            elif options and input_type == "choice":
                 for i, opt in enumerate(options, 1):
-                    print(f"   {i}. {opt['label']} -- {opt.get('description', '')}")
+                    log(f"   {i}. {opt['label']} -- {opt.get('description', '')}")
                 choice = input("   Choose (number): ").strip()
                 try:
                     idx = int(choice) - 1
@@ -65,13 +76,16 @@ class CliSession:
                 except (ValueError, IndexError):
                     value = choice
             elif input_type == "password":
-                import getpass
+                try:
+                    import getpass
 
-                value = getpass.getpass("   Enter value (hidden): ")
+                    value = getpass.getpass("   Enter value (hidden): ")
+                except (EOFError, OSError):
+                    value = input("   Enter value: ").strip()
             else:
                 value = input("   Your answer: ").strip()
 
-            print(f"{'=' * 60}")
+            log(f"{'=' * 60}")
 
             future = self._pending.pop(request_id, None)
             if future and not future.done():
@@ -83,26 +97,26 @@ class CliSession:
             prefix = "[stdout]" if stream == "stdout" else "[stderr]"
             lines = text.split("\n")
             if len(lines) > 20 and not self.verbose:
-                print(f"\n{prefix} ({len(lines)} lines, showing first/last 5)")
+                log(f"\n{prefix} ({len(lines)} lines, showing first/last 5)")
                 for line in lines[:5]:
-                    print(f"   {line}")
-                print(f"   ... ({len(lines) - 10} lines omitted) ...")
+                    log(f"   {line}")
+                log(f"   ... ({len(lines) - 10} lines omitted) ...")
                 for line in lines[-5:]:
-                    print(f"   {line}")
+                    log(f"   {line}")
             else:
-                print(f"\n{prefix}")
+                log(f"\n{prefix}")
                 for line in lines:
-                    print(f"   {line}")
+                    log(f"   {line}")
 
         elif msg_type == "status_update":
             phase = msg["phase"]
             message = msg["message"]
             progress = msg.get("progress")
             prog = f" ({progress:.0f}%)" if progress is not None else ""
-            print(f"\n[{phase.upper()}]{prog} {message}")
+            log(f"\n[{phase.upper()}]{prog} {message}")
 
         elif self.verbose:
-            print(f"\n[DEBUG] {json.dumps(msg, indent=2)}")
+            log(f"\n[DEBUG] {json.dumps(msg, indent=2)}")
 
     async def request_approval(self, command: str, description: str) -> bool:
         request_id = str(uuid.uuid4())
@@ -167,15 +181,15 @@ async def main():
         client = get_client()
         model = get_model()
     except ValueError as e:
-        print(f"Configuration error: {e}")
-        print("   Make sure .env has LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL")
+        log(f"Configuration error: {e}")
+        log("   Make sure .env has LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL")
         sys.exit(1)
 
-    print("One-Click Repo CLI")
-    print(f"   Model: {model}")
-    print(f"   URL: {args.url}")
-    print(f"   Auto-approve: {args.auto_approve}")
-    print(f"{'=' * 60}\n")
+    log("One-Click Repo CLI")
+    log(f"   Model: {model}")
+    log(f"   URL: {args.url}")
+    log(f"   Auto-approve: {args.auto_approve}")
+    log(f"{'=' * 60}\n")
 
     session = CliSession(auto_approve=args.auto_approve, verbose=args.verbose)
     registry = create_registry()
@@ -184,23 +198,35 @@ async def main():
     history: list[dict] = []
     user_msg = f"Please install this GitHub repository: {args.url}"
 
-    print(f"User: {user_msg}\n")
+    log(f"User: {user_msg}\n")
 
     try:
-        async for text in engine.run(user_msg, history):
-            print(f"\nAgent: {text}\n")
+        while True:
+            async for text in engine.run(user_msg, history):
+                log(f"\nAgent: {text}\n")
+
+            if args.auto_approve:
+                break
+
+            try:
+                user_msg = input("You (or 'q' to quit): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not user_msg or user_msg.lower() == "q":
+                break
+            log()
     except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
+        log("\n\nInterrupted by user")
     except Exception as e:
-        print(f"\nError: {e}")
+        log(f"\nError: {e}")
         if args.verbose:
             import traceback
 
             traceback.print_exc()
         sys.exit(1)
 
-    print(f"\n{'=' * 60}")
-    print("Done!")
+    log(f"\n{'=' * 60}")
+    log("Done!")
 
 
 if __name__ == "__main__":
