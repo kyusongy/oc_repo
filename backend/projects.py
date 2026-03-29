@@ -73,10 +73,14 @@ async def check_port_active(port: int) -> bool:
 
 
 async def refresh_statuses(projects: list[ProjectInfo]) -> list[ProjectInfo]:
+    all_ports = [port for p in projects for port in p.ports]
+    if all_ports:
+        results = await asyncio.gather(*[check_port_active(port) for port in all_ports])
+        port_active = dict(zip(all_ports, results))
+    else:
+        port_active = {}
     for p in projects:
-        if p.ports:
-            active = any([await check_port_active(port) for port in p.ports])
-            p.status = "running" if active else "stopped"
-        else:
-            p.status = "stopped"
+        p.status = (
+            "running" if any(port_active.get(port) for port in p.ports) else "stopped"
+        )
     return projects

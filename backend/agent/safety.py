@@ -18,7 +18,6 @@ SAFE_PATTERNS = [
     r"^curl\s+-[sS]",  # silent curl (GET checks)
     r"^curl\s+.*-I\b",  # HEAD requests
     r"^(lsof|ps|whoami|hostname|uname|sysctl|sw_vers)\b",
-    r"^cat\s*>\s*",  # write config files via heredoc
     r"^echo\b",
     r"^(sleep|true|false)\b",
     r"^test\s",

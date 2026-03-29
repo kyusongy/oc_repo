@@ -5,7 +5,13 @@ type MessageHandler = (msg: ServerMessage) => void;
 
 export function useWebSocket(onMessage: MessageHandler) {
   const wsRef = useRef<WebSocket | null>(null);
+  const onMessageRef = useRef(onMessage);
   const [connected, setConnected] = useState(false);
+
+  // Keep ref in sync without triggering reconnection
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -19,7 +25,7 @@ export function useWebSocket(onMessage: MessageHandler) {
     ws.onmessage = (event) => {
       try {
         const msg: ServerMessage = JSON.parse(event.data);
-        onMessage(msg);
+        onMessageRef.current(msg);
       } catch {
         console.error("Failed to parse WebSocket message:", event.data);
       }
@@ -27,7 +33,7 @@ export function useWebSocket(onMessage: MessageHandler) {
 
     wsRef.current = ws;
     return () => ws.close();
-  }, [onMessage]);
+  }, []);
 
   const send = useCallback((msg: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

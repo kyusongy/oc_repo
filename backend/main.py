@@ -67,44 +67,40 @@ async def _kill_project_ports(ports: list[int]):
                 pass
 
 
-@app.post("/api/projects/{name}/stop")
-async def stop_project(name: str):
+def _require_project(name: str):
     project = get_project(name)
     if not project:
         raise HTTPException(404, "Project not found")
-    await _kill_project_ports(project.ports)
-    # Update status
+    return project
+
+
+@app.post("/api/projects/{name}/stop")
+async def stop_project(name: str):
     projects = load_projects()
-    for p in projects:
-        if p.name == name:
-            p.status = "stopped"
+    project = next((p for p in projects if p.name == name), None)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    await _kill_project_ports(project.ports)
+    project.status = "stopped"
     save_projects(projects)
     return {"status": "stopped"}
 
 
 @app.delete("/api/projects/{name}")
 async def delete_project(name: str):
-    project = get_project(name)
-    if not project:
-        raise HTTPException(404, "Project not found")
-    # Stop first
+    project = _require_project(name)
     await _kill_project_ports(project.ports)
-    # Delete directory
     if os.path.exists(project.path):
         shutil.rmtree(project.path)
-    # Remove from tracking
     remove_project(name)
     return {"status": "removed"}
 
 
 @app.post("/api/projects/{name}/open")
 async def open_project(name: str):
-    project = get_project(name)
-    if not project:
-        raise HTTPException(404, "Project not found")
+    project = _require_project(name)
     if os.path.exists(project.path):
-        proc = await asyncio.create_subprocess_exec("open", project.path)
-        await proc.communicate()
+        await asyncio.create_subprocess_exec("open", project.path)
     return {"status": "opened", "path": project.path}
 
 

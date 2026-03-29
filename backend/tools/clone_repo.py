@@ -1,16 +1,13 @@
 import asyncio
 import os
 
+from backend.projects import _workspace
 from backend.tools.base import Tool, ToolResult
 
 
 def _repo_name(url: str) -> str:
     name = url.rstrip("/").rsplit("/", 1)[-1]
     return name.removesuffix(".git")
-
-
-def _workspace() -> str:
-    return os.environ.get("OC_WORKSPACE", os.path.expanduser("~/oc_repo_workspace"))
 
 
 class CloneRepoTool(Tool):

@@ -43,7 +43,6 @@ class AgentEngine:
             message = choice.message
 
             if message.tool_calls:
-                # Add assistant message with tool calls to history
                 history.append(
                     {
                         "role": "assistant",
@@ -68,11 +67,9 @@ class AgentEngine:
 
                     tool = self.registry.get(tool_name)
 
-                    # Inject session into tools that need it
                     if hasattr(tool, "session") and self.session:
                         tool.session = self.session
 
-                    # Notify frontend that a tool is starting
                     if self.session:
                         desc = arguments.get("description", tool_name)
                         await self.session.send(
@@ -87,6 +84,7 @@ class AgentEngine:
                     if tool.requires_approval and self.session:
                         command = arguments.get("command", str(arguments))
                         description = arguments.get("description", tool_name)
+                        approved = True
 
                         if self.auto_mode:
                             safety = await classify_command(
@@ -100,46 +98,36 @@ class AgentEngine:
                                         "description": description,
                                     }
                                 )
-                                # proceed to execute
                             elif safety == "dangerous":
                                 history.append(
                                     {
                                         "role": "tool",
                                         "tool_call_id": tc.id,
-                                        "content": "Command blocked for safety. This command was classified as dangerous and cannot be auto-executed.",
+                                        "content": "Command blocked: classified as dangerous.",
                                     }
                                 )
                                 continue
-                            else:  # sensitive
+                            else:
                                 approved = await self.session.request_approval(
                                     command, description
                                 )
-                                if not approved:
-                                    history.append(
-                                        {
-                                            "role": "tool",
-                                            "tool_call_id": tc.id,
-                                            "content": "User denied this action.",
-                                        }
-                                    )
-                                    continue
                         else:
                             approved = await self.session.request_approval(
                                 command, description
                             )
-                            if not approved:
-                                history.append(
-                                    {
-                                        "role": "tool",
-                                        "tool_call_id": tc.id,
-                                        "content": "User denied this action.",
-                                    }
-                                )
-                                continue
+
+                        if not approved:
+                            history.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc.id,
+                                    "content": "User denied this action.",
+                                }
+                            )
+                            continue
 
                     result = await tool.execute(arguments)
 
-                    # Stream command output if session is available
                     if tool_name == "run_command" and self.session:
                         await self.session.send_output("stdout", result.output)
 
