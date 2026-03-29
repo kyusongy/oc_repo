@@ -5,9 +5,12 @@ import type { ProjectInfo } from "../types";
 interface Props {
   project: ProjectInfo;
   lastAgentMessage: string;
+  chatInput: string;
+  onChatInputChange: (value: string) => void;
+  onChatSubmit: (e: React.FormEvent) => void;
 }
 
-export function SuccessScreen({ project, lastAgentMessage }: Props) {
+export function SuccessScreen({ project, lastAgentMessage, chatInput, onChatInputChange, onChatSubmit }: Props) {
   const [stopping, setStopping] = useState(false);
   const [stopped, setStopped] = useState(false);
 
@@ -142,6 +145,28 @@ export function SuccessScreen({ project, lastAgentMessage }: Props) {
           Back to Home
         </button>
       </div>
+
+      {/* Chat input for debugging */}
+      <footer className="sticky bottom-0 bg-surface p-4 border-t border-outline-variant/10 z-10">
+        <form onSubmit={onChatSubmit} className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 bg-surface-low rounded-xl p-2 focus-within:bg-surface-lowest focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => onChatInputChange(e.target.value)}
+              placeholder="Something not working? Ask the agent for help..."
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 font-body"
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim()}
+              className="signature-cta text-on-primary p-2.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center justify-center disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined">send</span>
+            </button>
+          </div>
+        </form>
+      </footer>
     </main>
   );
 }

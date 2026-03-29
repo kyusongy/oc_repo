@@ -3,9 +3,10 @@ import type { ProjectInfo } from "../types";
 
 interface Props {
   onRelaunch: (project: ProjectInfo) => void;
+  onView: (project: ProjectInfo) => void;
 }
 
-export function ProjectList({ onRelaunch }: Props) {
+export function ProjectList({ onRelaunch, onView }: Props) {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +53,9 @@ export function ProjectList({ onRelaunch }: Props) {
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <h3 className="font-headline font-bold text-on-surface truncate">{p.name}</h3>
+                <button onClick={() => onView(p)} className="font-headline font-bold text-on-surface truncate hover:text-tertiary transition-colors">
+                  {p.name}
+                </button>
                 <span className={`flex items-center gap-1.5 text-[10px] font-body uppercase tracking-widest ${p.status === "running" ? "text-emerald-600" : "text-on-surface-variant"}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${p.status === "running" ? "bg-emerald-500" : "bg-outline-variant"}`}></span>
                   {p.status}

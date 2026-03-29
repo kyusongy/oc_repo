@@ -47,6 +47,14 @@ export default function App() {
 
   const { send, connected } = useWebSocket(handleMessage);
 
+  const handleViewProject = (project: ProjectInfo) => {
+    setStarted(true);
+    setPhase("done");
+    setCurrentProject(project);
+    setStatusMessage(`${project.name} is installed and running`.toUpperCase());
+    setMessages([]);
+  };
+
   const handleRelaunch = (project: ProjectInfo) => {
     setStarted(true);
     setPhase("scanning");
@@ -82,6 +90,10 @@ export default function App() {
     setMessages((prev) => [...prev, { kind: "user", text: chatInput }]);
     send({ type: "message", text: chatInput });
     setChatInput("");
+    // Drop out of success screen into chat view so user sees agent response
+    if (phase === "done") {
+      setPhase("installing");
+    }
   };
 
   return (
@@ -120,7 +132,7 @@ export default function App() {
       {!started ? (
         <>
           <LandingHero onSubmit={handleUrlSubmit} />
-          <ProjectList onRelaunch={handleRelaunch} />
+          <ProjectList onRelaunch={handleRelaunch} onView={handleViewProject} />
           <footer className="w-full py-8 px-6 border-t border-outline-variant/10">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <p className="text-xs font-body uppercase tracking-widest text-on-surface-variant/40">
@@ -133,6 +145,9 @@ export default function App() {
         <SuccessScreen
           project={currentProject}
           lastAgentMessage={messages.filter((m) => m.kind === "agent").pop()?.text || ""}
+          chatInput={chatInput}
+          onChatInputChange={setChatInput}
+          onChatSubmit={handleChatSubmit}
         />
       ) : (
         <>
