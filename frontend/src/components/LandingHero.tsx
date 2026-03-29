@@ -2,9 +2,11 @@ import { useState } from "react";
 
 interface Props {
   onSubmit: (url: string) => void;
+  autoMode: boolean;
+  onToggleMode: () => void;
 }
 
-export function LandingHero({ onSubmit }: Props) {
+export function LandingHero({ onSubmit, autoMode, onToggleMode }: Props) {
   const [url, setUrl] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,6 +70,22 @@ export function LandingHero({ onSubmit }: Props) {
               <span className="material-symbols-outlined text-[18px]">rocket_launch</span>
               <span>One-click launch</span>
             </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <span className={`text-sm font-body ${!autoMode ? 'text-on-surface font-semibold' : 'text-on-surface-variant'}`}>
+              Safe Mode
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onToggleMode(); }}
+              className={`relative w-12 h-6 rounded-full transition-colors ${autoMode ? 'bg-tertiary' : 'bg-outline-variant'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${autoMode ? 'translate-x-6' : ''}`} />
+            </button>
+            <span className={`text-sm font-body ${autoMode ? 'text-on-surface font-semibold' : 'text-on-surface-variant'}`}>
+              Auto Mode
+            </span>
           </div>
         </form>
       </section>

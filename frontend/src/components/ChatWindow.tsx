@@ -4,13 +4,17 @@ import { MessageBubble } from "./MessageBubble";
 import { ApprovalCard } from "./ApprovalCard";
 import { UserInputWidget } from "./UserInputWidget";
 import { TerminalOutput } from "./TerminalOutput";
+import { ThinkingIndicator } from "./ThinkingIndicator";
+import { AutoApprovedCard } from "./AutoApprovedCard";
+import { ToolStartCard } from "./ToolStartCard";
 
 interface Props {
   messages: ChatMessage[];
   onSend: (msg: ClientMessage) => void;
+  isThinking?: boolean;
 }
 
-export function ChatWindow({ messages, onSend }: Props) {
+export function ChatWindow({ messages, onSend, isThinking }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,36 +34,43 @@ export function ChatWindow({ messages, onSend }: Props) {
         {messages.map((msg, i) => {
           switch (msg.kind) {
             case "agent":
-              return <MessageBubble key={i} role="agent" text={msg.text} />;
+              return <div key={i} className="animate-fade-in"><MessageBubble role="agent" text={msg.text} /></div>;
             case "user":
-              return <MessageBubble key={i} role="user" text={msg.text} />;
+              return <div key={i} className="animate-fade-in"><MessageBubble role="user" text={msg.text} /></div>;
             case "approval":
               return (
-                <ApprovalCard
-                  key={i}
-                  command={msg.command}
-                  description={msg.description}
-                  resolved={msg.resolved}
-                  onApprove={() => onSend({ type: "approval", request_id: msg.request_id, approved: true })}
-                  onDeny={() => onSend({ type: "approval", request_id: msg.request_id, approved: false })}
-                />
+                <div key={i} className="animate-fade-in">
+                  <ApprovalCard
+                    command={msg.command}
+                    description={msg.description}
+                    resolved={msg.resolved}
+                    onApprove={() => onSend({ type: "approval", request_id: msg.request_id, approved: true })}
+                    onDeny={() => onSend({ type: "approval", request_id: msg.request_id, approved: false })}
+                  />
+                </div>
               );
             case "input":
               return (
-                <UserInputWidget
-                  key={i}
-                  question={msg.question}
-                  options={msg.options}
-                  inputType={msg.input_type}
-                  resolved={msg.resolved}
-                  onSubmit={(value) => onSend({ type: "user_input", request_id: msg.request_id, value })}
-                />
+                <div key={i} className="animate-fade-in">
+                  <UserInputWidget
+                    question={msg.question}
+                    options={msg.options}
+                    inputType={msg.input_type}
+                    resolved={msg.resolved}
+                    onSubmit={(value) => onSend({ type: "user_input", request_id: msg.request_id, value })}
+                  />
+                </div>
               );
             case "output":
-              return <TerminalOutput key={i} stream={msg.stream} text={msg.text} />;
+              return <div key={i} className="animate-fade-in"><TerminalOutput stream={msg.stream} text={msg.text} /></div>;
+            case "auto_approved":
+              return <AutoApprovedCard key={i} command={msg.command} description={msg.description} />;
+            case "tool_start":
+              return <ToolStartCard key={i} toolName={msg.tool_name} description={msg.description} />;
           }
         })}
 
+        {isThinking && <ThinkingIndicator />}
         <div ref={bottomRef} />
       </div>
     </div>

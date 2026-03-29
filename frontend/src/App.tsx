@@ -15,16 +15,21 @@ export default function App() {
   const [started, setStarted] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [currentProject, setCurrentProject] = useState<ProjectInfo | null>(null);
+  const [autoMode, setAutoMode] = useState(true);
+  const [isThinking, setIsThinking] = useState(false);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
       case "agent_message":
+        setIsThinking(false);
         setMessages((prev) => [...prev, { kind: "agent", text: msg.text }]);
         break;
       case "approval_request":
+        setIsThinking(false);
         setMessages((prev) => [...prev, { kind: "approval", request_id: msg.request_id, command: msg.command, description: msg.description }]);
         break;
       case "user_input_request":
+        setIsThinking(false);
         setMessages((prev) => [...prev, { kind: "input", request_id: msg.request_id, question: msg.question, options: msg.options, input_type: msg.input_type }]);
         break;
       case "command_output":
@@ -36,11 +41,19 @@ export default function App() {
         setProgress(msg.progress);
         break;
       case "done":
+        setIsThinking(false);
         setPhase(msg.success ? "done" : "error");
         setStatusMessage(msg.message);
         break;
       case "project_saved":
         setCurrentProject(msg.project);
+        break;
+      case "auto_approved":
+        setIsThinking(false);
+        setMessages((prev) => [...prev, { kind: "auto_approved", command: msg.command, description: msg.description }]);
+        break;
+      case "tool_start":
+        setMessages((prev) => [...prev, { kind: "tool_start", tool_name: msg.tool_name, description: msg.description }]);
         break;
     }
   }, []);
@@ -60,14 +73,15 @@ export default function App() {
     setPhase("scanning");
     setCurrentProject(null);
     setMessages([{ kind: "user", text: `Relaunch ${project.name}` }]);
-    send({ type: "start", url: project.url, path: project.path });
+    send({ type: "start", url: project.url, path: project.path, auto_mode: autoMode });
   };
 
   const handleUrlSubmit = (url: string) => {
     setStarted(true);
     setPhase("scanning");
+    setIsThinking(true);
     setMessages([{ kind: "user", text: url }]);
-    send({ type: "start", url });
+    send({ type: "start", url, auto_mode: autoMode });
   };
 
   const handleSend = (msg: ClientMessage) => {
@@ -90,6 +104,7 @@ export default function App() {
     setMessages((prev) => [...prev, { kind: "user", text: chatInput }]);
     send({ type: "message", text: chatInput });
     setChatInput("");
+    setIsThinking(true);
     // Drop out of success screen into chat view so user sees agent response
     if (phase === "done") {
       setPhase("installing");
@@ -131,7 +146,7 @@ export default function App() {
       {/* Main content */}
       {!started ? (
         <>
-          <LandingHero onSubmit={handleUrlSubmit} />
+          <LandingHero onSubmit={handleUrlSubmit} autoMode={autoMode} onToggleMode={() => setAutoMode(!autoMode)} />
           <ProjectList onRelaunch={handleRelaunch} onView={handleViewProject} />
           <footer className="w-full py-8 px-6 border-t border-outline-variant/10">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -151,7 +166,7 @@ export default function App() {
         />
       ) : (
         <>
-          <ChatWindow messages={messages} onSend={handleSend} />
+          <ChatWindow messages={messages} onSend={handleSend} isThinking={isThinking} />
 
           {/* Chat input */}
           <footer className="bg-surface p-4 border-t border-outline-variant/10 z-10">
