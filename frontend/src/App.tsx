@@ -126,7 +126,7 @@ export default function App() {
       <header className="bg-surface/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
         <div className="flex justify-between items-center w-full px-6 py-4">
           <div className="flex items-center gap-4">
-            <span className="text-xl font-bold tracking-tighter text-on-surface font-headline">oc_repo</span>
+            <button onClick={() => window.location.reload()} className="text-xl font-bold tracking-tighter text-on-surface font-headline hover:text-tertiary transition-colors">oc_repo</button>
             {started && (
               <>
                 <div className="bg-surface-low h-5 w-px mx-2"></div>
