@@ -3,6 +3,7 @@ import json
 from openai import AsyncOpenAI
 
 from backend.agent.prompt import SYSTEM_PROMPT
+from backend.agent.safety import classify_command
 from backend.session import Session
 from backend.tools.base import ToolRegistry
 
