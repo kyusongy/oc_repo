@@ -19,9 +19,15 @@ def log(msg: str = ""):
 class CliSession:
     """Terminal-based session that replaces WebSocket communication."""
 
-    def __init__(self, auto_approve: bool = False, verbose: bool = False):
+    def __init__(
+        self,
+        auto_approve: bool = False,
+        verbose: bool = False,
+        default_input: str | None = None,
+    ):
         self.auto_approve = auto_approve
         self.verbose = verbose
+        self.default_input = default_input
         self._pending: dict[str, asyncio.Future] = {}
 
     async def send(self, msg: dict):
@@ -63,9 +69,16 @@ class CliSession:
             if self.auto_approve:
                 if options and input_type == "choice":
                     value = options[0]["label"]
+                elif self.default_input:
+                    value = self.default_input
                 else:
                     value = "SKIPPED_IN_AUTO_MODE"
-                log(f"   Auto-response: {value}")
+                display = (
+                    value[:8] + "..."
+                    if input_type == "password" and len(value) > 8
+                    else value
+                )
+                log(f"   Auto-response: {display}")
             elif options and input_type == "choice":
                 for i, opt in enumerate(options, 1):
                     log(f"   {i}. {opt['label']} -- {opt.get('description', '')}")
@@ -171,6 +184,11 @@ async def main():
         "--auto-approve", action="store_true", help="Auto-approve all commands"
     )
     parser.add_argument(
+        "--default-input",
+        default=None,
+        help="Default value for user input prompts in auto mode",
+    )
+    parser.add_argument(
         "--verbose", action="store_true", help="Show raw tool calls/results"
     )
     args = parser.parse_args()
@@ -191,7 +209,11 @@ async def main():
     log(f"   Auto-approve: {args.auto_approve}")
     log(f"{'=' * 60}\n")
 
-    session = CliSession(auto_approve=args.auto_approve, verbose=args.verbose)
+    session = CliSession(
+        auto_approve=args.auto_approve,
+        verbose=args.verbose,
+        default_input=args.default_input,
+    )
     registry = create_registry()
     engine = AgentEngine(client, model, registry, session)
 
