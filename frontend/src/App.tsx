@@ -17,22 +17,27 @@ export default function App() {
   const [currentProject, setCurrentProject] = useState<ProjectInfo | null>(null);
   const [autoMode, setAutoMode] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
+  const [currentTool, setCurrentTool] = useState<{ name: string; description: string } | null>(null);
 
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
       case "agent_message":
         setIsThinking(false);
+        setCurrentTool(null);
         setMessages((prev) => [...prev, { kind: "agent", text: msg.text }]);
         break;
       case "approval_request":
         setIsThinking(false);
+        setCurrentTool(null);
         setMessages((prev) => [...prev, { kind: "approval", request_id: msg.request_id, command: msg.command, description: msg.description }]);
         break;
       case "user_input_request":
         setIsThinking(false);
+        setCurrentTool(null);
         setMessages((prev) => [...prev, { kind: "input", request_id: msg.request_id, question: msg.question, options: msg.options, input_type: msg.input_type }]);
         break;
       case "command_output":
+        setCurrentTool(null);
         setMessages((prev) => [...prev, { kind: "output", stream: msg.stream, text: msg.text }]);
         break;
       case "status_update":
@@ -42,6 +47,7 @@ export default function App() {
         break;
       case "done":
         setIsThinking(false);
+        setCurrentTool(null);
         setPhase(msg.success ? "done" : "error");
         setStatusMessage(msg.message);
         break;
@@ -50,10 +56,13 @@ export default function App() {
         break;
       case "auto_approved":
         setIsThinking(false);
+        setCurrentTool(null);
         setMessages((prev) => [...prev, { kind: "auto_approved", command: msg.command, description: msg.description }]);
         break;
       case "tool_start":
-        setMessages((prev) => [...prev, { kind: "tool_start", tool_name: msg.tool_name, description: msg.description }]);
+        // Transient — replaces previous, not added to message history
+        setCurrentTool({ name: msg.tool_name, description: msg.description });
+        setIsThinking(false);
         break;
     }
   }, []);
@@ -166,7 +175,7 @@ export default function App() {
         />
       ) : (
         <>
-          <ChatWindow messages={messages} onSend={handleSend} isThinking={isThinking} />
+          <ChatWindow messages={messages} onSend={handleSend} isThinking={isThinking} currentTool={currentTool} />
 
           {/* Chat input */}
           <footer className="bg-surface p-4 border-t border-outline-variant/10 z-10">

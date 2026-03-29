@@ -24,8 +24,7 @@ export type ChatMessage =
   | { kind: "approval"; request_id: string; command: string; description: string; resolved?: boolean }
   | { kind: "input"; request_id: string; question: string; options?: { label: string; description: string }[]; input_type: "text" | "password" | "choice"; resolved?: boolean }
   | { kind: "output"; stream: "stdout" | "stderr"; text: string }
-  | { kind: "auto_approved"; command: string; description: string }
-  | { kind: "tool_start"; tool_name: string; description: string };
+  | { kind: "auto_approved"; command: string; description: string };
 
 export interface ProjectInfo {
   name: string;

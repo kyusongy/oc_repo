@@ -12,14 +12,15 @@ interface Props {
   messages: ChatMessage[];
   onSend: (msg: ClientMessage) => void;
   isThinking?: boolean;
+  currentTool?: { name: string; description: string } | null;
 }
 
-export function ChatWindow({ messages, onSend, isThinking }: Props) {
+export function ChatWindow({ messages, onSend, isThinking, currentTool }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, currentTool, isThinking]);
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-8">
@@ -65,12 +66,11 @@ export function ChatWindow({ messages, onSend, isThinking }: Props) {
               return <div key={i} className="animate-fade-in"><TerminalOutput stream={msg.stream} text={msg.text} /></div>;
             case "auto_approved":
               return <AutoApprovedCard key={i} command={msg.command} description={msg.description} />;
-            case "tool_start":
-              return <ToolStartCard key={i} toolName={msg.tool_name} description={msg.description} />;
           }
         })}
 
-        {isThinking && <ThinkingIndicator />}
+        {currentTool && <ToolStartCard toolName={currentTool.name} description={currentTool.description} />}
+        {isThinking && !currentTool && <ThinkingIndicator />}
         <div ref={bottomRef} />
       </div>
     </div>
