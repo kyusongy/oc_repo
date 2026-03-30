@@ -146,6 +146,8 @@ export default function App() {
           return m;
         })
       );
+      // Show thinking while command executes after approval/input
+      setIsThinking(true);
     }
     send(msg);
   };
