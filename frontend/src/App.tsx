@@ -179,6 +179,15 @@ export default function App() {
                     {phase === "idle" ? "Ready" : phase}
                   </span>
                 </div>
+                {started && phase !== "done" && (
+                  <button
+                    onClick={handleGoHome}
+                    className="ml-2 px-2 py-1 text-xs font-body text-on-surface-variant hover:text-error transition-colors"
+                    title="Cancel and go home"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -221,26 +230,38 @@ export default function App() {
         <>
           <ChatWindow messages={messages} onSend={handleSend} isThinking={isThinking} currentTool={currentTool} />
 
-          {/* Chat input */}
+          {/* Chat input footer — show recovery when error */}
           <footer className="bg-surface p-4 border-t border-outline-variant/10 z-10">
-            <form onSubmit={handleChatSubmit} className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-3 bg-surface-low rounded-xl p-2 focus-within:bg-surface-lowest focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask a question or type a message..."
-                  className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 font-body"
-                />
+            {phase === "error" ? (
+              <div className="max-w-4xl mx-auto flex items-center justify-center gap-4">
+                <span className="text-sm text-on-surface-variant">Something went wrong.</span>
                 <button
-                  type="submit"
-                  disabled={!chatInput.trim()}
-                  className="signature-cta text-on-primary p-2.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center justify-center disabled:opacity-40"
+                  onClick={handleGoHome}
+                  className="px-4 py-2 text-sm font-semibold text-primary bg-primary-container rounded-lg hover:bg-primary-container/80 transition-colors"
                 >
-                  <span className="material-symbols-outlined">send</span>
+                  Back to Home
                 </button>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleChatSubmit} className="max-w-4xl mx-auto">
+                <div className="flex items-center gap-3 bg-surface-low rounded-xl p-2 focus-within:bg-surface-lowest focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask a question or type a message..."
+                    className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 font-body"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim()}
+                    className="signature-cta text-on-primary p-2.5 rounded-lg shadow-sm transition-all active:scale-95 flex items-center justify-center disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined">send</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </footer>
         </>
       )}
