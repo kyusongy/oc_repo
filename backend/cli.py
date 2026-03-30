@@ -177,36 +177,16 @@ class CliSession:
             future.set_result(value)
 
 
-async def main():
-    parser = argparse.ArgumentParser(description="One-Click Repo CLI")
-    parser.add_argument("url", help="GitHub repository URL to install")
-    parser.add_argument(
-        "--auto-approve", action="store_true", help="Auto-approve all commands"
-    )
-    parser.add_argument(
-        "--default-input",
-        default=None,
-        help="Default value for user input prompts in auto mode",
-    )
-    parser.add_argument(
-        "--verbose", action="store_true", help="Show raw tool calls/results"
-    )
-    args = parser.parse_args()
-
+async def cmd_install(args):
+    """Install a GitHub repo."""
     load_dotenv()
-
-    try:
-        client = get_client()
-        model = get_model()
-    except ValueError as e:
-        log(f"Configuration error: {e}")
-        log("   Make sure .env has LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL")
-        sys.exit(1)
+    client = get_client()
+    model = get_model()
 
     log("One-Click Repo CLI")
     log(f"   Model: {model}")
     log(f"   URL: {args.url}")
-    log(f"   Auto-approve: {args.auto_approve}")
+    log(f"   Mode: {'auto' if args.auto_approve else 'safe'}")
     log(f"{'=' * 60}\n")
 
     session = CliSession(
@@ -215,21 +195,18 @@ async def main():
         default_input=args.default_input,
     )
     registry = create_registry()
-    engine = AgentEngine(client, model, registry, session)
+    engine = AgentEngine(client, model, registry, session, auto_mode=args.auto_approve)
 
-    history: list[dict] = []
+    history = []
     user_msg = f"Please install this GitHub repository: {args.url}"
-
     log(f"User: {user_msg}\n")
 
     try:
         while True:
             async for text in engine.run(user_msg, history):
                 log(f"\nAgent: {text}\n")
-
             if args.auto_approve:
                 break
-
             try:
                 user_msg = input("You (or 'q' to quit): ").strip()
             except (EOFError, KeyboardInterrupt):
@@ -238,7 +215,7 @@ async def main():
                 break
             log()
     except KeyboardInterrupt:
-        log("\n\nInterrupted by user")
+        log("\n\nInterrupted")
     except Exception as e:
         log(f"\nError: {e}")
         if args.verbose:
@@ -247,8 +224,201 @@ async def main():
             traceback.print_exc()
         sys.exit(1)
 
-    log(f"\n{'=' * 60}")
-    log("Done!")
+
+async def cmd_list(args):
+    """List installed projects."""
+    from backend.projects import load_projects_with_auto_detect, refresh_statuses
+
+    projects = load_projects_with_auto_detect()
+    projects = await refresh_statuses(projects)
+
+    if not projects:
+        log("No projects found in workspace.")
+        return
+
+    log(f"{'Name':<25} {'Status':<10} {'Ports':<15} {'URL'}")
+    log("-" * 80)
+    for p in projects:
+        ports = ", ".join(str(port) for port in p.ports) if p.ports else "-"
+        url = p.url or "(auto-detected)"
+        log(f"{p.name:<25} {p.status:<10} {ports:<15} {url}")
+
+
+async def cmd_stop(args):
+    """Stop a running project."""
+    from backend.projects import (
+        load_projects,
+        save_projects,
+        load_projects_with_auto_detect,
+    )
+
+    projects = load_projects()
+    project = next((p for p in projects if p.name == args.name), None)
+
+    if not project:
+        # Check auto-detected
+        all_projects = load_projects_with_auto_detect()
+        project = next((p for p in all_projects if p.name == args.name), None)
+
+    if not project:
+        log(f"Project '{args.name}' not found.")
+        sys.exit(1)
+
+    if not project.ports:
+        log(f"No ports tracked for '{args.name}'. Nothing to stop.")
+        return
+
+    import os
+
+    my_pid = os.getpid()
+    for port in project.ports:
+        proc = await asyncio.create_subprocess_shell(
+            f"lsof -ti:{port}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        for pid_str in stdout.decode().strip().split("\n"):
+            if not pid_str:
+                continue
+            try:
+                pid = int(pid_str)
+            except ValueError:
+                continue
+            if pid != my_pid:
+                try:
+                    os.kill(pid, 15)
+                    log(f"Killed PID {pid} on port {port}")
+                except ProcessLookupError:
+                    pass
+
+    # Update status
+    projects = load_projects()
+    for p in projects:
+        if p.name == args.name:
+            p.status = "stopped"
+    save_projects(projects)
+    log(f"Stopped '{args.name}'")
+
+
+async def cmd_remove(args):
+    """Stop and remove a project."""
+    import os
+    import shutil
+    from backend.projects import remove_project, load_projects_with_auto_detect
+
+    all_projects = load_projects_with_auto_detect()
+    project = next((p for p in all_projects if p.name == args.name), None)
+
+    if not project:
+        log(f"Project '{args.name}' not found.")
+        sys.exit(1)
+
+    if not args.force:
+        confirm = (
+            input(f"Remove '{args.name}' and delete {project.path}? [y/N]: ")
+            .strip()
+            .lower()
+        )
+        if confirm not in ("y", "yes"):
+            log("Cancelled.")
+            return
+
+    # Stop first
+    if project.ports:
+        await cmd_stop(type("Args", (), {"name": args.name})())
+
+    # Delete directory
+    if os.path.exists(project.path):
+        shutil.rmtree(project.path)
+        log(f"Deleted {project.path}")
+
+    remove_project(args.name)
+    log(f"Removed '{args.name}'")
+
+
+async def cmd_history(args):
+    """Show installation history for a project."""
+    from backend.projects import load_history, load_projects_with_auto_detect
+
+    all_projects = load_projects_with_auto_detect()
+    project = next((p for p in all_projects if p.name == args.name), None)
+
+    if not project:
+        log(f"Project '{args.name}' not found.")
+        sys.exit(1)
+
+    history = load_history(project.path)
+    if not history:
+        log(f"No history found for '{args.name}'.")
+        return
+
+    log(f"Session history for '{args.name}' ({len(history)} messages):\n")
+    for msg in history:
+        kind = msg.get("kind", "?")
+        if kind == "agent":
+            log(
+                f"Agent: {msg['text'][:200]}{'...' if len(msg.get('text', '')) > 200 else ''}\n"
+            )
+        elif kind == "user":
+            log(f"User: {msg['text']}\n")
+        elif kind == "auto_approved":
+            log(f"  [auto] {msg.get('description', '')} — {msg.get('command', '')}")
+        elif kind == "approval":
+            resolved = "approved" if msg.get("resolved") else "pending"
+            log(
+                f"  [approval:{resolved}] {msg.get('description', '')} — {msg.get('command', '')}"
+            )
+        elif kind == "output":
+            lines = msg.get("text", "").split("\n")
+            log(f"  [{msg.get('stream', 'output')}] ({len(lines)} lines)")
+
+
+async def main():
+    parser = argparse.ArgumentParser(description="One-Click Repo CLI")
+    sub = parser.add_subparsers(dest="command", help="Available commands")
+
+    # install
+    p_install = sub.add_parser("install", help="Install a GitHub repository")
+    p_install.add_argument("url", help="GitHub repository URL")
+    p_install.add_argument(
+        "--auto-approve", action="store_true", help="Auto-approve safe commands"
+    )
+    p_install.add_argument(
+        "--default-input", default=None, help="Default value for user input prompts"
+    )
+    p_install.add_argument("--verbose", action="store_true")
+
+    # list
+    sub.add_parser("list", help="List installed projects")
+
+    # stop
+    p_stop = sub.add_parser("stop", help="Stop a running project")
+    p_stop.add_argument("name", help="Project name")
+
+    # remove
+    p_remove = sub.add_parser("remove", help="Remove an installed project")
+    p_remove.add_argument("name", help="Project name")
+    p_remove.add_argument("--force", action="store_true", help="Skip confirmation")
+
+    # history
+    p_history = sub.add_parser("history", help="Show installation history")
+    p_history.add_argument("name", help="Project name")
+
+    args = parser.parse_args()
+
+    if args.command == "install":
+        await cmd_install(args)
+    elif args.command == "list":
+        await cmd_list(args)
+    elif args.command == "stop":
+        await cmd_stop(args)
+    elif args.command == "remove":
+        await cmd_remove(args)
+    elif args.command == "history":
+        await cmd_history(args)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
