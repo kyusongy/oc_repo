@@ -1,5 +1,6 @@
 import os
 
+from backend.projects import _workspace
 from backend.tools.base import Tool, ToolResult
 
 
@@ -28,27 +29,29 @@ class WriteFileTool(Tool):
         },
         "required": ["path", "content", "description"],
     }
-    requires_approval = False  # Safe — just writes a file, no shell
+    requires_approval = False
 
     async def execute(self, params: dict) -> ToolResult:
         path = os.path.abspath(params["path"])
         content = params["content"]
         workspace = os.path.abspath(_workspace())
 
-        # Only allow writes inside the workspace
-        if not path.startswith(workspace + os.sep) and not path.startswith(workspace):
-            return ToolResult(
-                output=f"Blocked: can only write files inside {workspace}",
-                success=False,
-            )
+        # Only allow writes inside the workspace (use realpath to prevent traversal)
+        try:
+            real_path = os.path.realpath(path)
+            real_workspace = os.path.realpath(workspace)
+            if not real_path.startswith(real_workspace + os.sep):
+                return ToolResult(
+                    output=f"Blocked: can only write files inside {workspace}",
+                    success=False,
+                )
+        except (OSError, ValueError):
+            return ToolResult(output="Blocked: invalid path", success=False)
 
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w") as f:
                 f.write(content)
-            return ToolResult(
-                output=f"File written: {path}",
-                success=True,
-            )
+            return ToolResult(output=f"File written: {path}", success=True)
         except Exception as e:
             return ToolResult(output=f"Error writing file: {e}", success=False)

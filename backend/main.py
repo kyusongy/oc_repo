@@ -65,7 +65,10 @@ async def _kill_project_ports(ports: list[int]):
         for pid_str in stdout.decode().strip().split("\n"):
             if not pid_str:
                 continue
-            pid = int(pid_str)
+            try:
+                pid = int(pid_str)
+            except ValueError:
+                continue
             if pid == my_pid:
                 continue  # never kill ourselves
             try:
