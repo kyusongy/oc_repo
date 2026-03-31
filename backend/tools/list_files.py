@@ -2,6 +2,7 @@ import fnmatch
 import json
 import os
 
+from backend.projects import _workspace
 from backend.tools.base import Tool, ToolResult
 
 
@@ -32,9 +33,25 @@ class ListFilesTool(Tool):
     requires_approval = False
 
     async def execute(self, params: dict) -> ToolResult:
-        path = params["path"]
+        path = os.path.abspath(params["path"])
         pattern = params.get("pattern")
         max_depth = params.get("max_depth", 3)
+        workspace = os.path.abspath(_workspace())
+
+        # Only allow listing inside the workspace
+        try:
+            real_path = os.path.realpath(path)
+            real_workspace = os.path.realpath(workspace)
+            if not (
+                real_path == real_workspace
+                or real_path.startswith(real_workspace + os.sep)
+            ):
+                return ToolResult(
+                    output=f"Blocked: can only list files inside {workspace}",
+                    success=False,
+                )
+        except (OSError, ValueError):
+            return ToolResult(output="Blocked: invalid path", success=False)
 
         if not os.path.isdir(path):
             return ToolResult(output=f"Directory not found: {path}", success=False)

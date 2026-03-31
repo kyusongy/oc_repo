@@ -4,7 +4,8 @@ from backend.tools.list_files import ListFilesTool
 
 
 @pytest.mark.asyncio
-async def test_list_files_basic(tmp_repo):
+async def test_list_files_basic(tmp_repo, monkeypatch):
+    monkeypatch.setenv("OC_WORKSPACE", str(tmp_repo))
     tool = ListFilesTool()
     result = await tool.execute({"path": str(tmp_repo)})
     assert result.success is True
@@ -15,7 +16,8 @@ async def test_list_files_basic(tmp_repo):
 
 
 @pytest.mark.asyncio
-async def test_list_files_with_pattern(tmp_repo):
+async def test_list_files_with_pattern(tmp_repo, monkeypatch):
+    monkeypatch.setenv("OC_WORKSPACE", str(tmp_repo))
     tool = ListFilesTool()
     result = await tool.execute({"path": str(tmp_repo), "pattern": "*.md"})
     files = json.loads(result.output)
@@ -24,7 +26,18 @@ async def test_list_files_with_pattern(tmp_repo):
 
 
 @pytest.mark.asyncio
-async def test_list_files_nonexistent():
+async def test_list_files_nonexistent(tmp_path, monkeypatch):
+    monkeypatch.setenv("OC_WORKSPACE", str(tmp_path))
     tool = ListFilesTool()
-    result = await tool.execute({"path": "/nonexistent/path"})
+    result = await tool.execute({"path": str(tmp_path / "nonexistent")})
     assert result.success is False
+
+
+@pytest.mark.asyncio
+async def test_list_files_blocks_outside_workspace(tmp_path, monkeypatch):
+    monkeypatch.setenv("OC_WORKSPACE", str(tmp_path / "workspace"))
+    (tmp_path / "workspace").mkdir()
+    tool = ListFilesTool()
+    result = await tool.execute({"path": str(tmp_path)})
+    assert result.success is False
+    assert "Blocked" in result.output

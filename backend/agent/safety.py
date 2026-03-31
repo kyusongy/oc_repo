@@ -13,7 +13,6 @@ SAFE_PATTERNS = [
     r"^cat\s+[^>|]",  # cat for reading only, not redirecting
     r"^(python3?|node|ruby|go|java|cargo)\s+(-[vV]|--version)",
     r"^mkdir\b",
-    r"^(cp|mv)\b",
     r"^git\s+(clone|status|log|diff|branch)\b",
     r"^curl\s+-[sS]",  # silent curl (GET checks)
     r"^curl\s+.*-I\b",  # HEAD requests

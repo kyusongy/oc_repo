@@ -1,5 +1,6 @@
 import os
 
+from backend.projects import _workspace
 from backend.tools.base import Tool, ToolResult
 
 DEFAULT_MAX_LINES = 200
@@ -28,8 +29,21 @@ class ReadFileTool(Tool):
     requires_approval = False
 
     async def execute(self, params: dict) -> ToolResult:
-        path = params["path"]
+        path = os.path.abspath(params["path"])
         max_lines = params.get("max_lines", DEFAULT_MAX_LINES)
+        workspace = os.path.abspath(_workspace())
+
+        # Only allow reads inside the workspace
+        try:
+            real_path = os.path.realpath(path)
+            real_workspace = os.path.realpath(workspace)
+            if not real_path.startswith(real_workspace + os.sep):
+                return ToolResult(
+                    output=f"Blocked: can only read files inside {workspace}",
+                    success=False,
+                )
+        except (OSError, ValueError):
+            return ToolResult(output="Blocked: invalid path", success=False)
 
         if not os.path.isfile(path):
             return ToolResult(output=f"File not found: {path}", success=False)
